@@ -7,6 +7,8 @@ using System.DirectoryServices;
 using System.Collections;
 using System.Diagnostics;
 using System.DirectoryServices.AccountManagement;
+using System.Security.Principal;
+using Helpers.DirectoryServices;
 
 namespace ADStuff
 {
@@ -15,30 +17,21 @@ namespace ADStuff
 
     class Program
     {
-        // c# - How do I loop through a PropertyCollection - Stack Overflow <http://stackoverflow.com/questions/640792/how-do-i-loop-through-a-propertycollection>
-        private static void DisplayInfo(string userName)
+        /// <summary>
+        /// Gets AD info using "WinNT://" . Has limited properties unlike LDAP://
+        /// </summary>
+        /// <param name="fullUserName">Expects full DOMAIN/USERNAME note the FORWARD slash</param>
+        /// <returns>System.DirectoryServices.PropertyCollection </returns>
+        public static System.DirectoryServices.PropertyCollection DisplayInfo(string fullUserName)
         {
-            string queryString = @"WinNT://" + userName; 
+            // c# - How do I loop through a PropertyCollection - Stack Overflow <http://stackoverflow.com/questions/640792/how-do-i-loop-through-a-propertycollection>
+            // DirectoryEntry.Path Property (System.DirectoryServices) <https://msdn.microsoft.com/en-us/library/system.directoryservices.directoryentry.path(v=vs.110).aspx>
+            string queryString = @"WinNT://" + fullUserName; 
             DirectoryEntry obDirEntry = new DirectoryEntry(queryString);
-            System.DirectoryServices.PropertyCollection coll = obDirEntry.Properties;
-            IDictionaryEnumerator ide = coll.GetEnumerator();
-            ide.Reset();
-            while (ide.MoveNext())
-            {
-                PropertyValueCollection pvc = ide.Entry.Value as PropertyValueCollection;
-
-                Console.WriteLine("{0} : {1}", ide.Entry.Key.ToString(), pvc.Value);
-            }
-
-            // Debugger.Break();
-            object obVal = coll["FullName"].Value;
-
-            string _User = obVal.ToString();
-            Console.WriteLine(_User);
-            // Console.WriteLine(coll["StreetAddress"].Value.ToString());
+            return obDirEntry.Properties;
         }
 
-        private static void GetAllEntries() // MESSY!
+        private static void GetAllEntries() // overkill, gets everything...everything
         {
             using (var context = new PrincipalContext(ContextType.Domain, "sbs.local"))
             {
@@ -76,16 +69,21 @@ namespace ADStuff
         // Querying and Updating Active Directory Using C# (C Sharp) <http://www.ianatkinson.net/computing/adcsharp.htm#ex6>
         // UserPrincipal Class (System.DirectoryServices.AccountManagement) <https://msdn.microsoft.com/en-us/library/system.directoryservices.accountmanagement.userprincipal(v=vs.110).aspx>
 
-        static void GetAUserPrincipal(String username)
+        static void GetAUserPrincipal(String fullNetworkName)
         {
             try  
-            {  
+            {
+                string[] tokens = fullNetworkName.Split(new Char[] { '/', '\\' });
+                if (tokens.Length != 2)
+                    return ; // expecting domain\username
+                string userPrincipalName = String.Format("{0}@{1}", tokens[1], tokens[0]);
+                
                 // enter AD settings  
-                PrincipalContext AD = new PrincipalContext(ContextType.Domain, "sbs.local");  
+                PrincipalContext AD = new PrincipalContext(ContextType.Domain, tokens[0]);  
   
                 // create search user and add criteria  
                 UserPrincipal u = new UserPrincipal(AD);
-                u.SamAccountName = username;
+                u.SamAccountName = tokens[1];
   
                 // search for user  
                 PrincipalSearcher search = new PrincipalSearcher(u);  
@@ -96,7 +94,12 @@ namespace ADStuff
                 Console.WriteLine("Given Name : " + result.GivenName);  
 
                 Console.WriteLine("Display Name : " + result.DisplayName);  
-                Console.WriteLine("Phone Number : " + result.VoiceTelephoneNumber);  
+                Console.WriteLine("Phone Number : " + result.VoiceTelephoneNumber);
+                Console.WriteLine("DistinguishedName : " + result.DistinguishedName);
+                Console.WriteLine("Sid : " + result.Sid);
+
+                Console.WriteLine("UserCannotChangePassword : " + result.UserCannotChangePassword);
+                Console.WriteLine("UserPrincipalName : " + result.UserPrincipalName);
             }  
   
             catch (Exception e)  
@@ -107,21 +110,104 @@ namespace ADStuff
         }
         public static void Main()
         {
+            Console.WriteLine();
             string fullNetworkName = @"SBSLocal\ETIDALGO";
+            //string fullNetworkName = @"SBS312002\Julius";
+            //string fullNetworkName = @"SBS312002\ETIDALGO";
+            //string fullNetworkName = @"SBS312002\PASHCROFT";
             string domainSlashMachine = fullNetworkName.Replace(@"\", @"/");
 
-            DisplayInfo(domainSlashMachine);
+            Console.WriteLine(" ---------------------------------------------------------- Using DirectoryEntry");
+            System.DirectoryServices.PropertyCollection coll = DisplayInfo(domainSlashMachine);
+            if (coll != null)
+            {
+                IDictionaryEnumerator ide = coll.GetEnumerator();
+                ide.Reset();
+                while (ide.MoveNext())
+                {
+                    PropertyValueCollection pvc = ide.Entry.Value as PropertyValueCollection;
+
+                    Console.WriteLine("{0} : {1}", ide.Entry.Key.ToString(), pvc.Value);
+                }
+
+                // Debugger.Break();
+                object obVal = coll["FullName"].Value;
+
+                string _User = obVal.ToString();
+                Console.WriteLine(_User);
+                var sid = new SecurityIdentifier((byte[])coll["objectSid"].Value, 0);
+                Console.WriteLine(sid.ToString());
+                // Console.WriteLine(coll["StreetAddress"].Value.ToString());
+            }
+            // ------------------------------
 
             string[] names = domainSlashMachine.Split(new Char[] { '/', '\\' });
             string userName = names[names.Count() - 1];
 
+
             // GetAllEntries();
-            GetAUserPrincipal(userName);
+            Console.WriteLine(" ----------------------------------------------------- Using PrincipalContext");
+
+            GetAUserPrincipal(fullNetworkName);
 
             // Console.Write("Enter user (firstname surname): ");
             // String fullName = Console.ReadLine();
 
-            DirServices.GetUserInfo(userName);
+            // ------------------------------
+            Console.WriteLine(" ----------------------------------------------------- Using DirectorySearcher");
+
+            SearchResult userInfo = ADUtilities.GetUserInfo(fullNetworkName);
+            if (userInfo != null)
+            {
+                // user exists, cycle through LDAP fields (cn, telephonenumber etc.)
+                ResultPropertyCollection fields = userInfo.Properties;
+
+                foreach (String ldapField in fields.PropertyNames)
+                {
+                    // cycle through objects in each field e.g. group membership
+                    // (for many fields there will only be one object such as name)
+
+                    foreach (Object myCollection in fields[ldapField])
+                        Console.WriteLine(String.Format("{0,-20} : {1}", ldapField, myCollection.ToString()));
+
+                }
+
+                Console.WriteLine();
+                // Arrays Tutorial (C#) <https://msdn.microsoft.com/en-us/library/aa288453(v=vs.71).aspx>
+                string[,] pairs = new string[,] { 
+                        { "displayName", "Fool Name" }, 
+                        { "name", "Name" },
+                        { "streetAddress", "Street Address"},
+                        {"mail", "Mail"},
+                        {"telephoneNumber", "Phone"},
+                        {"freezingpoint", "Freezing Point"},
+                        {"sAMAccountName", "sAMAccountName"},
+                        {"title", "Title"},
+                        {"department", "Department"}
+                    };
+
+                for (int i = 0; i < pairs.GetLength(0); i++)
+                {
+                    // for most fields there will be only one object, ie fields["displayname"][0]
+                    if (fields.Contains(pairs[i, 0]))
+                        Console.WriteLine("{0}: {1}", pairs[i, 1], fields[pairs[i, 0]][0].ToString()); // uglyuglyugly
+                }
+
+                // alternatively
+                Console.WriteLine(" ---------------------------------------------------------- Using extensions");
+                for (int i = 0; i < pairs.GetLength(0); i++)
+                {
+                    Console.WriteLine("{0}: {1}", pairs[i, 1], fields.PropertyValue(pairs[i, 0], "[Not found ]" ));
+                }
+
+
+            }
+            else
+            {
+                // user does not exist
+                Console.WriteLine("User ({0}) not found!", fullNetworkName);
+            }
+
         }
     }
 }
