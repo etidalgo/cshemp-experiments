@@ -108,7 +108,7 @@ namespace ADStuff
             }  
 
         }
-        public static void Main()
+        public static void Main( string[] args )
         {
             Console.WriteLine();
             string fullNetworkName = @"SBSLocal\ETIDALGO";
