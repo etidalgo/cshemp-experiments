@@ -25,11 +25,10 @@ function onClickHandler(info, tab) {
 };
 
 function getClickHandler() {
-	return function(info, tab) {};
-}
-function onCopyTitle() {
-}
-
+	return function(info, tab) {
+		alert("here!");
+	};
+};
 
 chrome.contextMenus.onClicked.addListener(onClickHandler);
 
@@ -46,12 +45,21 @@ chrome.runtime.onInstalled.addListener(function() {
     console.log("'" + context + "' item:" + id);
   }
 
-  // Create a parent item and two children.
+  // Can't attach onclick event
   chrome.contextMenus.create({
 	  "title": "Copy Title and URL", 
-	  "id": "btnCopyTitle"
-	  });
+	  "id": "btnCopyTitle",
+	  "type" : "normal",
+	  "contexts": ["all"]
+	  //"onclick": getClickHandler() // cannot do this  - javascript - Chrome extension context menu not showing up - Stack Overflow <http://stackoverflow.com/questions/28954811/chrome-extension-context-menu-not-showing-up>
+
+	}, function() {
+    if (chrome.extension.lastError) {
+      console.log("Got expected error: " + chrome.extension.lastError.message);
+    }
+  });
   
+  // Create a parent item and two children.
   chrome.contextMenus.create({"title": "Test parent item", "id": "parent"});
   chrome.contextMenus.create(
       {"title": "Child 1", "parentId": "parent", "id": "child1"});
