@@ -24,6 +24,13 @@ function onClickHandler(info, tab) {
   }
 };
 
+function getClickHandler() {
+	return function(info, tab) {};
+}
+function onCopyTitle() {
+}
+
+
 chrome.contextMenus.onClicked.addListener(onClickHandler);
 
 // Set up context menu tree at install time.
@@ -40,6 +47,11 @@ chrome.runtime.onInstalled.addListener(function() {
   }
 
   // Create a parent item and two children.
+  chrome.contextMenus.create({
+	  "title": "Copy Title and URL", 
+	  "id": "btnCopyTitle"
+	  });
+  
   chrome.contextMenus.create({"title": "Test parent item", "id": "parent"});
   chrome.contextMenus.create(
       {"title": "Child 1", "parentId": "parent", "id": "child1"});
