@@ -1,0 +1,4 @@
+Getting Started: Building a Chrome Extension - Google Chrome <https://developer.chrome.com/extensions/getstarted>
+
+chrome.contextMenus - Google Chrome <https://developer.chrome.com/extensions/contextMenus>
+
