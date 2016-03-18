@@ -51,7 +51,7 @@ chrome.runtime.onInstalled.addListener(function() {
 	  "id": "btnCopyTitle",
 	  "type" : "normal",
 	  "contexts": ["all"]
-	  //"onclick": getClickHandler() // cannot do this  - javascript - Chrome extension context menu not showing up - Stack Overflow <http://stackoverflow.com/questions/28954811/chrome-extension-context-menu-not-showing-up>
+	  // "onclick": getClickHandler() // cannot do this  - javascript - Chrome extension context menu not showing up - Stack Overflow <http://stackoverflow.com/questions/28954811/chrome-extension-context-menu-not-showing-up>
 
 	}, function() {
     if (chrome.extension.lastError) {
