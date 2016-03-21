@@ -24,6 +24,8 @@ function onClickHandler(info, tab) {
   }
 };
 
+chrome.contextMenus.onClicked.addListener(onClickHandler);
+
 // Copy To Clipboard in Google Chrome Extensions using Javascript. Source: http://www.pakzilla.com/2012/03/20/how-to-copy-to-clipboard-in-chrome-extension/ · GitHub <https://gist.github.com/joeperrin-gists/8814825>
 function copyToClipboard(text) {
   const input = document.createElement('input');
@@ -39,8 +41,6 @@ function copyToClipboard(text) {
 
 function getClickHandler() {
 	return function(info, tab) {
-		if (info.selectionText !== null) {
-		}
 		var title = tab.title;
 		if (title=='')(title='Untitled');
 
@@ -50,24 +50,47 @@ function getClickHandler() {
 	};
 };
 
-chrome.contextMenus.onClicked.addListener(onClickHandler);
+function CopyAndCite(info, tab) {
+
+		var title = tab.title;
+		if (title=='')(title='Untitled');
+
+		var fullText = title + ' <' + tab.url + '>\r\n';
+		if (info.selectionText !== null) {
+			fullText = fullText + info.selectionText;
+		}		
+		copyToClipboard(fullText);
+		
+};
 
 // Set up context menu tree at install time.
 chrome.runtime.onInstalled.addListener(function() {
   // var contexts = ["page","selection","link","editable","image","video", "audio"];
 
-  chrome.contextMenus.create({
+  chrome.contextMenus.create(
+  {
 	  "title": "Copy Title and URL", 
 	  "id": "btnCopyTitle",
 	  "type" : "normal",
 	  "contexts": ["all"],
-	  "onclick": getClickHandler() // cannot do this  - javascript - Chrome extension context menu not showing up - Stack Overflow <http://stackoverflow.com/questions/28954811/chrome-extension-context-menu-not-showing-up>
-
+	  "onclick": getClickHandler() 
 	}, function() {
     if (chrome.extension.lastError) {
       console.log("Got expected error: " + chrome.extension.lastError.message);
     }
   });
   
+  chrome.contextMenus.create(
+  {
+	  "title": "Copy and Cite", 
+	  "id": "btnCopyAndCite",
+	  "type" : "normal",
+	  "contexts": ["selection"],
+	  "onclick": CopyAndCite 
+	}, function() {
+    if (chrome.extension.lastError) {
+      console.log("Got expected error: " + chrome.extension.lastError.message);
+    }
+  });
 
 });
